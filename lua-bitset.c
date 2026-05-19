@@ -1,0 +1,143 @@
+#include "lua.h"
+#include "lauxlib.h"
+#include "bitset.h"
+
+#define BITSET_MT "bitset"
+
+struct lua_bitset
+{
+    struct bitset_t *bs;
+};
+
+static uint64_t
+check_index(lua_State *L, int idx)
+{
+    lua_Integer index = luaL_checkinteger(L, idx);
+    if(index < 0){
+        luaL_error(L, "index must be non-negative");
+    }
+    return (uint64_t)index;
+}
+
+static int
+lbitset_set(lua_State *L)
+{
+    struct lua_bitset *bs = luaL_checkudata(L, 1, BITSET_MT);
+    uint64_t index = check_index(L, 2);
+    int res = bit_set(bs->bs, index);
+    lua_pushboolean(L, res == 0);
+    return 1;
+}
+
+static int
+lbitset_test(lua_State *L)
+{
+    struct lua_bitset *bs = luaL_checkudata(L, 1, BITSET_MT);
+    uint64_t index = check_index(L, 2);
+    int res = bit_test(bs->bs, index);
+    lua_pushboolean(L, res == 1);
+    return 1;
+}
+
+static int
+lbitset_flip(lua_State *L)
+{
+    struct lua_bitset *bs = luaL_checkudata(L, 1, BITSET_MT);
+    uint64_t index = check_index(L, 2);
+    int res = bit_flip(bs->bs, index);
+    lua_pushboolean(L, res == 0);
+    return 1;
+}
+
+static int
+lbitset_fill(lua_State *L)
+{
+    struct lua_bitset *bs = luaL_checkudata(L, 1, BITSET_MT);
+    int res = bit_fill(bs->bs);
+    lua_pushboolean(L, res == 0);
+    return 1;
+}
+
+static int
+lbitset_reset(lua_State *L)
+{
+    struct lua_bitset *bs = luaL_checkudata(L, 1, BITSET_MT);
+    int res = bit_reset(bs->bs);
+    lua_pushboolean(L, res == 0);
+    return 1;
+}
+
+static int
+lbitset_count(lua_State *L)
+{
+    struct lua_bitset *bs = luaL_checkudata(L, 1, BITSET_MT);
+    lua_pushinteger(L, bit_count(bs->bs));
+    return 1;
+}
+
+static int
+lbitset_clear(lua_State *L)
+{
+    struct lua_bitset *bs = luaL_checkudata(L, 1, BITSET_MT);
+    uint64_t index = check_index(L, 2);
+    int res = bit_clear(bs->bs, index);
+    lua_pushboolean(L, res == 0);
+    return 1;
+}
+
+static int
+lbitset_free(lua_State *L)
+{
+    struct lua_bitset *bs = luaL_checkudata(L, 1, BITSET_MT);
+    if (bs->bs != NULL) {
+        bitset_free(bs->bs);
+        bs->bs = NULL;
+    }
+    return 0;
+}
+
+static const luaL_Reg bitset_mt[] = {
+    { "set", lbitset_set },
+    { "test", lbitset_test },
+    { "flip", lbitset_flip },
+    { "fill", lbitset_fill },
+    { "reset", lbitset_reset },
+    { "count", lbitset_count },
+    { "clear", lbitset_clear },
+    { NULL, NULL }
+};
+
+static int
+lbitset_new(lua_State *L)
+{
+    lua_Integer size = luaL_checkinteger(L, 1);
+    if(size <= 0){
+        return luaL_error(L, "size must be positive");
+    }
+    struct lua_bitset *bs = lua_newuserdata(L, sizeof(struct lua_bitset));
+    bs->bs = bitset_new((uint64_t)size);
+    if(bs->bs == NULL){
+        luaL_error(L, "bitset_new failed");
+    }
+    luaL_getmetatable(L, BITSET_MT);
+    lua_setmetatable(L, -2);
+    return 1;
+}
+
+static const luaL_Reg bitset[] = {
+    { "new", lbitset_new },
+    { NULL, NULL }
+};
+
+int
+luaopen_bitset(lua_State *L)
+{   
+    luaL_newmetatable(L, BITSET_MT);
+    lua_pushvalue(L, -1);
+    lua_setfield(L, -2, "__index");
+    luaL_setfuncs(L, bitset_mt, 0);
+    lua_pushcfunction(L, lbitset_free);
+    lua_setfield(L, -2, "__gc");
+    luaL_newlib(L, bitset);
+    return 1;
+}
