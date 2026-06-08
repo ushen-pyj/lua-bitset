@@ -55,6 +55,13 @@ function bitset_methods:clear_range(start, count) end
 ---@return boolean
 function bitset_methods:test_range(start, count) end
 
+---@return string
+function bitset_methods:pack() end
+
 ---@param size integer
 ---@return bitset
 function bitset.new(size) end
+
+---@param data string
+---@return bitset
+function bitset.unpack(data) end
