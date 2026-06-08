@@ -135,6 +135,25 @@ bit_size(struct bitset_t *bs)
 {
     return bs->bit_size;
 }
+
+uint64_t
+bitset_size(const struct bitset_t *bs)
+{
+    return bs->bit_size;
+}
+
+size_t
+bitset_word_count(const struct bitset_t *bs)
+{
+    return bs->word_count;
+}
+
+uint64_t *
+bitset_words(struct bitset_t *bs)
+{
+    return bs->words;
+}
+
 int
 bit_any(struct bitset_t *bs)
 {

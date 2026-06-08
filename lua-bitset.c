@@ -119,6 +119,53 @@ lbitset_test_range(lua_State *L)
 }
 
 static int
+lbitset_pack(lua_State *L)
+{
+    struct lua_bitset *bs = luaL_checkudata(L, 1, BITSET_MT);
+    uint64_t bit_size = bitset_size(bs->bs);
+    size_t word_count = bitset_word_count(bs->bs);
+    const uint64_t *words = bitset_words(bs->bs);
+
+    lua_pushlstring(L, (const char *)&bit_size, sizeof(uint64_t));
+    lua_pushlstring(L, (const char *)words, word_count * sizeof(uint64_t));
+    lua_concat(L, 2);
+    return 1;
+}
+
+static int
+lbitset_unpack(lua_State *L)
+{
+    size_t len;
+    const char *data = luaL_checklstring(L, 1, &len);
+
+    if (len < sizeof(uint64_t)) {
+        return luaL_error(L, "invalid packed data: too short");
+    }
+
+    uint64_t bit_size;
+    memcpy(&bit_size, data, sizeof(uint64_t));
+
+    size_t word_count = (bit_size / 64) + ((bit_size & 63) != 0);
+    size_t expected_len = sizeof(uint64_t) + word_count * sizeof(uint64_t);
+
+    if (len < expected_len) {
+        return luaL_error(L, "invalid packed data: unexpected length");
+    }
+
+    struct lua_bitset *bs = lua_newuserdata(L, sizeof(struct lua_bitset));
+    bs->bs = bitset_new(bit_size);
+    if (bs->bs == NULL) {
+        return luaL_error(L, "bitset_unpack: allocation failed");
+    }
+
+    memcpy(bitset_words(bs->bs), data + sizeof(uint64_t), word_count * sizeof(uint64_t));
+
+    luaL_getmetatable(L, BITSET_MT);
+    lua_setmetatable(L, -2);
+    return 1;
+}
+
+static int
 lbitset_free(lua_State *L)
 {
     struct lua_bitset *bs = luaL_checkudata(L, 1, BITSET_MT);
@@ -140,6 +187,7 @@ static const luaL_Reg bitset_mt[] = {
     { "set_range", lbitset_set_range },
     { "clear_range", lbitset_clear_range },
     { "test_range", lbitset_test_range },
+    { "pack", lbitset_pack },
     { NULL, NULL }
 };
 
@@ -162,6 +210,7 @@ lbitset_new(lua_State *L)
 
 static const luaL_Reg bitset[] = {
     { "new", lbitset_new },
+    { "unpack", lbitset_unpack },
     { NULL, NULL }
 };
 

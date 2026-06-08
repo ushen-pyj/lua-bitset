@@ -353,4 +353,83 @@ for _, size in ipairs({1, 2, 31, 32, 33, 63, 64, 65, 127, 128, 129, 255, 256}) d
     assert_eq(b:count(), 0, "count should be 0 after clear_range for size " .. size)
 end
 
+print("== pack / unpack: basic round-trip ==")
+local bp = bitset.new(100)
+bp:set(0)
+bp:set(50)
+bp:set(99)
+local packed = bp:pack()
+assert(type(packed) == "string", "pack should return a string")
+local bp2 = bitset.unpack(packed)
+assert(bp2 ~= nil, "unpack should return a bitset")
+assert_eq(bp2:count(), 3, "round-trip count should be 3")
+assert_true(bp2:test(0), "round-trip bit 0 should be true")
+assert_true(bp2:test(50), "round-trip bit 50 should be true")
+assert_true(bp2:test(99), "round-trip bit 99 should be true")
+assert_false(bp2:test(1), "round-trip bit 1 should be false")
+assert_false(bp2:test(98), "round-trip bit 98 should be false")
+
+print("== pack / unpack: empty bitset ==")
+local be2 = bitset.new(200)
+local pe = be2:pack()
+local be3 = bitset.unpack(pe)
+assert_eq(be3:count(), 0, "empty bitset count should be 0")
+for i = 0, 199 do
+    assert_false(be3:test(i), "empty bitset bit " .. i .. " should be false")
+end
+
+print("== pack / unpack: filled bitset ==")
+local bf2 = bitset.new(128)
+bf2:fill()
+local pf = bf2:pack()
+local bf3 = bitset.unpack(pf)
+assert_eq(bf3:count(), 128, "filled bitset count should be 128")
+assert_true(bf3:test_range(0, 128), "filled bitset test_range should be true")
+
+print("== pack / unpack: various sizes ==")
+for _, size in ipairs({1, 2, 31, 32, 33, 63, 64, 65, 127, 128, 129, 255, 256, 1000}) do
+    local orig = bitset.new(size)
+    -- set a pattern: every 3rd bit
+    for i = 0, size - 1, 3 do
+        orig:set(i)
+    end
+    local expected_count = orig:count()
+    local data = orig:pack()
+    local restored = bitset.unpack(data)
+    assert_eq(restored:count(), expected_count,
+        "count mismatch after round-trip, size=" .. size)
+    for i = 0, size - 1 do
+        local expected = orig:test(i)
+        local actual = restored:test(i)
+        if expected ~= actual then
+            error(string.format(
+                "bit mismatch at index %d, size=%d: expected %s, got %s",
+                i, size, tostring(expected), tostring(actual)
+            ), 2)
+        end
+    end
+end
+
+print("== pack / unpack: pattern after fill and reset ==")
+local bp3 = bitset.new(64)
+bp3:fill()
+bp3:reset()
+bp3:set(0)
+bp3:set(63)
+local p3 = bp3:pack()
+local bp4 = bitset.unpack(p3)
+assert_eq(bp4:count(), 2, "count should be 2")
+assert_true(bp4:test(0), "bit 0 should be true")
+assert_true(bp4:test(63), "bit 63 should be true")
+assert_false(bp4:test(1), "bit 1 should be false")
+
+print("== unpack: invalid data ==")
+assert_error(function()
+    bitset.unpack("")
+end, "unpack empty string should error")
+
+assert_error(function()
+    bitset.unpack("short")
+end, "unpack short string should error")
+
 print("ALL TESTS PASSED")
