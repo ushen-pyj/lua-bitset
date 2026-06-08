@@ -86,6 +86,39 @@ lbitset_clear(lua_State *L)
 }
 
 static int
+lbitset_set_range(lua_State *L)
+{
+    struct lua_bitset *bs = luaL_checkudata(L, 1, BITSET_MT);
+    uint64_t start = check_index(L, 2);
+    uint64_t count = check_index(L, 3);
+    int res = bit_set_range(bs->bs, start, count);
+    lua_pushboolean(L, res == 0);
+    return 1;
+}
+
+static int
+lbitset_clear_range(lua_State *L)
+{
+    struct lua_bitset *bs = luaL_checkudata(L, 1, BITSET_MT);
+    uint64_t start = check_index(L, 2);
+    uint64_t count = check_index(L, 3);
+    int res = bit_clear_range(bs->bs, start, count);
+    lua_pushboolean(L, res == 0);
+    return 1;
+}
+
+static int
+lbitset_test_range(lua_State *L)
+{
+    struct lua_bitset *bs = luaL_checkudata(L, 1, BITSET_MT);
+    uint64_t start = check_index(L, 2);
+    uint64_t count = check_index(L, 3);
+    int res = bit_test_range(bs->bs, start, count);
+    lua_pushboolean(L, res == 1);
+    return 1;
+}
+
+static int
 lbitset_free(lua_State *L)
 {
     struct lua_bitset *bs = luaL_checkudata(L, 1, BITSET_MT);
@@ -104,6 +137,9 @@ static const luaL_Reg bitset_mt[] = {
     { "reset", lbitset_reset },
     { "count", lbitset_count },
     { "clear", lbitset_clear },
+    { "set_range", lbitset_set_range },
+    { "clear_range", lbitset_clear_range },
+    { "test_range", lbitset_test_range },
     { NULL, NULL }
 };
 

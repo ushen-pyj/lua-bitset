@@ -161,4 +161,84 @@ bit_none(struct bitset_t *bs)
     return 1;
 }
 
+static inline int
+validate_range(struct bitset_t *bs, uint64_t start, uint64_t count,
+               size_t *start_word, size_t *start_bit,
+               size_t *end_word, size_t *end_bit)
+{
+    if (count == 0 || start >= bs->bit_size || start + count > bs->bit_size)
+        return -1;
+    uint64_t end = start + count - 1;
+    *start_word = start >> 6;
+    *start_bit = start & 63;
+    *end_word = end >> 6;
+    *end_bit = end & 63;
+    return 0;
+}
 
+static inline uint64_t
+word_mask(size_t lo, size_t hi)
+{
+    size_t n = hi - lo + 1;
+    uint64_t mask = (n == 64) ? ~0ULL : ((1ULL << n) - 1);
+    return mask << lo;
+}
+
+int
+bit_set_range(struct bitset_t *bs, uint64_t start, uint64_t count)
+{
+    size_t sw, sb, ew, eb;
+    if (validate_range(bs, start, count, &sw, &sb, &ew, &eb) != 0)
+        return 1;
+
+    if (sw == ew) {
+        bs->words[sw] |= word_mask(sb, eb);
+    } else {
+        bs->words[sw] |= word_mask(sb, 63);
+        for (size_t i = sw + 1; i < ew; i++)
+            bs->words[i] = ~0ULL;
+        bs->words[ew] |= word_mask(0, eb);
+    }
+    return 0;
+}
+
+int
+bit_clear_range(struct bitset_t *bs, uint64_t start, uint64_t count)
+{
+    size_t sw, sb, ew, eb;
+    if (validate_range(bs, start, count, &sw, &sb, &ew, &eb) != 0)
+        return 1;
+
+    if (sw == ew) {
+        bs->words[sw] &= ~word_mask(sb, eb);
+    } else {
+        bs->words[sw] &= ~word_mask(sb, 63);
+        for (size_t i = sw + 1; i < ew; i++)
+            bs->words[i] = 0;
+        bs->words[ew] &= ~word_mask(0, eb);
+    }
+    return 0;
+}
+
+int
+bit_test_range(struct bitset_t *bs, uint64_t start, uint64_t count)
+{
+    size_t sw, sb, ew, eb;
+    if (validate_range(bs, start, count, &sw, &sb, &ew, &eb) != 0)
+        return -1;
+
+    if (sw == ew) {
+        uint64_t mask = word_mask(sb, eb);
+        return (bs->words[sw] & mask) == mask;
+    }
+
+    uint64_t fmask = word_mask(sb, 63);
+    if ((bs->words[sw] & fmask) != fmask)
+        return 0;
+    for (size_t i = sw + 1; i < ew; i++) {
+        if (bs->words[i] != ~0ULL)
+            return 0;
+    }
+    uint64_t emask = word_mask(0, eb);
+    return (bs->words[ew] & emask) == emask;
+}

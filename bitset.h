@@ -14,3 +14,6 @@ int bit_test(struct bitset_t *bs, uint64_t index);
 int bit_flip(struct bitset_t *bs, uint64_t index);
 int bit_fill(struct bitset_t *bs);
 int bit_reset(struct bitset_t *bs);
+int bit_set_range(struct bitset_t *bs, uint64_t start, uint64_t count);
+int bit_clear_range(struct bitset_t *bs, uint64_t start, uint64_t count);
+int bit_test_range(struct bitset_t *bs, uint64_t start, uint64_t count);

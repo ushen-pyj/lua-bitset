@@ -227,4 +227,130 @@ end
 
 assert_eq(b:count(), 0, "after clearing even bits, count should be 0")
 
+print("== range: set_range / test_range / clear_range basic ==")
+local br = bitset.new(100)
+assert_true(br:set_range(0, 10), "set_range(0, 10) failed")
+assert_eq(br:count(), 10, "count should be 10 after set_range(0, 10)")
+
+-- test_range should return true when all bits in range are set
+assert_true(br:test_range(0, 10), "test_range(0, 10) should be true")
+
+-- test_range should return false when some bits are clear
+assert_false(br:test_range(0, 11), "test_range(0, 11) should be false (bit 10 not set)")
+
+-- clear range
+assert_true(br:clear_range(0, 5), "clear_range(0, 5) failed")
+assert_eq(br:count(), 5, "count should be 5 after clear_range(0, 5)")
+assert_false(br:test_range(0, 5), "test_range(0, 5) should be false after clear")
+assert_true(br:test_range(5, 5), "test_range(5, 5) should still be true")
+
+-- clear remaining
+assert_true(br:clear_range(5, 5), "clear_range(5, 5) failed")
+assert_eq(br:count(), 0, "count should be 0 after clearing all")
+
+print("== range: count=1 degenerate (single bit) ==")
+local b1 = bitset.new(10)
+assert_true(b1:set_range(3, 1), "set_range(3, 1) failed")
+assert_true(b1:test(3), "test(3) should be true")
+assert_eq(b1:count(), 1, "count should be 1")
+assert_true(b1:test_range(3, 1), "test_range(3, 1) should be true")
+assert_true(b1:clear_range(3, 1), "clear_range(3, 1) failed")
+assert_false(b1:test(3), "test(3) should be false after clear_range")
+
+print("== range: full word boundary ==")
+local bw = bitset.new(128)
+assert_true(bw:set_range(60, 10), "set_range(60, 10) cross boundary failed")
+assert_eq(bw:count(), 10, "count should be 10")
+assert_true(bw:test_range(60, 10), "test_range(60, 10) should be true")
+
+-- verify individual bits
+for i = 0, 127 do
+    if i >= 60 and i < 70 then
+        assert_true(bw:test(i), "bit " .. i .. " should be true")
+    else
+        assert_false(bw:test(i), "bit " .. i .. " should be false")
+    end
+end
+
+assert_true(bw:clear_range(60, 10), "clear_range(60, 10) failed")
+assert_eq(bw:count(), 0, "count should be 0 after clear_range cross boundary")
+
+print("== range: entire bitset ==")
+local be = bitset.new(200)
+assert_true(be:set_range(0, 200), "set_range(0, 200) failed")
+assert_eq(be:count(), 200, "count should be 200")
+assert_true(be:test_range(0, 200), "test_range(0, 200) should be true")
+
+assert_true(be:clear_range(0, 200), "clear_range(0, 200) failed")
+assert_eq(be:count(), 0, "count should be 0")
+
+-- fill and test range 0..size
+assert_true(be:fill(), "fill failed")
+assert_true(be:test_range(0, 200), "test_range(0, 200) should be true after fill")
+
+print("== range: set_range after fill (no-op) ==")
+local bf = bitset.new(64)
+assert_true(bf:fill(), "fill failed")
+assert_true(bf:test_range(0, 64), "test_range(0, 64) should be true after fill")
+-- setting already-set bits should be fine
+assert_true(bf:set_range(0, 64), "set_range(0, 64) on filled bitset failed")
+assert_eq(bf:count(), 64, "count should still be 64")
+
+print("== range: out of bounds ==")
+local bo = bitset.new(50)
+assert_false(bo:set_range(0, 51), "set_range(0, 51) should fail (exceeds size)")
+assert_false(bo:set_range(50, 1), "set_range(50, 1) should fail (start == size)")
+assert_false(bo:set_range(49, 2), "set_range(49, 2) should fail (start+count > size)")
+assert_false(bo:clear_range(0, 51), "clear_range(0, 51) should fail")
+assert_false(bo:clear_range(50, 1), "clear_range(50, 1) should fail")
+assert_false(bo:test_range(50, 1), "test_range(50, 1) should be false (out of bounds)")
+assert_false(bo:test_range(0, 51), "test_range(0, 51) should be false (out of bounds)")
+
+print("== range: count=0 edge case ==")
+local bz = bitset.new(10)
+assert_false(bz:set_range(0, 0), "set_range(0, 0) should fail")
+assert_false(bz:clear_range(0, 0), "clear_range(0, 0) should fail")
+assert_false(bz:test_range(0, 0), "test_range(0, 0) should fail")
+
+print("== range: stress multi-word ==")
+local bs = bitset.new(1000)
+-- set every other block of 10
+for i = 0, 99 do
+    local start = i * 10
+    if i % 2 == 0 then
+        assert_true(bs:set_range(start, 10), "set_range(" .. start .. ", 10) failed")
+    end
+end
+assert_eq(bs:count(), 500, "count should be 500 after setting 50 blocks of 10")
+
+-- verify
+for i = 0, 99 do
+    local start = i * 10
+    if i % 2 == 0 then
+        assert_true(bs:test_range(start, 10), "test_range(" .. start .. ", 10) should be true")
+    else
+        assert_false(bs:test_range(start, 10), "test_range(" .. start .. ", 10) should be false")
+    end
+end
+
+-- clear all
+for i = 0, 99 do
+    if i % 2 == 0 then
+        assert_true(bs:clear_range(i * 10, 10), "clear_range failed")
+    end
+end
+assert_eq(bs:count(), 0, "count should be 0 after clearing all blocks")
+
+print("== range: various sizes and alignments ==")
+for _, size in ipairs({1, 2, 31, 32, 33, 63, 64, 65, 127, 128, 129, 255, 256}) do
+    local b = bitset.new(size)
+    -- set the whole thing
+    assert_true(b:set_range(0, size), "set_range(0, " .. size .. ") failed")
+    assert_eq(b:count(), size, "count should be " .. size)
+    assert_true(b:test_range(0, size), "test_range(0, " .. size .. ") should be true")
+    -- clear it
+    assert_true(b:clear_range(0, size), "clear_range(0, " .. size .. ") failed")
+    assert_eq(b:count(), 0, "count should be 0 after clear_range for size " .. size)
+end
+
 print("ALL TESTS PASSED")
